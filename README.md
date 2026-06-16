@@ -32,9 +32,13 @@ You can run the compiled binary directly to start the interactive selection sess
 ### Commands
 
 `y`: yank / copy current selection (or entire screen) to clipboard
+
 `:w <optional_path>`: save current selection (or entire screen) to filesystem. defaults to ~/Pictures/Screenshots or relative path from there unless full path given
+
 `:wq <optional_path>`: same as `:w` but quits automatically
+
 `:q`: quit without saving
+
 `esc`: cancel selection or quit if in normal mode
 
 ### Installation
