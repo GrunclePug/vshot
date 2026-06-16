@@ -29,6 +29,14 @@ You can run the compiled binary directly to start the interactive selection sess
 ./bin/vshot -v
 ```
 
+### Commands
+
+`y`: yank / copy current selection (or entire screen) to clipboard
+`:w <optional_path>`: save current selection (or entire screen) to filesystem. defaults to ~/Pictures/Screenshots or relative path from there unless full path given
+`:wq <optional_path>`: same as `:w` but quits automatically
+`:q`: quit without saving
+`esc`: cancel selection or quit if in normal mode
+
 ### Installation
 
 #### Requirements
@@ -37,8 +45,8 @@ You can run the compiled binary directly to start the interactive selection sess
 * Make
 * Clipboard Utility: `xclip` (preferred) or `xsel` (fallback)
 * X11 development headers:
- * Arch Linux : `sudo pacman -S libx11`
- * Debian/Ubuntu: `sudo apt install libx11-dev
+  * Arch Linux : `sudo pacman -S libx11`
+  * Debian/Ubuntu: `sudo apt install libx11-dev`
 
 #### Configuration
 
