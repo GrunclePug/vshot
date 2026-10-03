@@ -1,165 +1,156 @@
 package ui
 
 import (
+	"fmt"
 	"image"
 
-	"github.com/grunclepug/vshot/internal/display"
+	"github.com/grunclepug/vshot/internal/config"
 )
 
-type Mode int
+type handle int
 
 const (
-	ModeNormal Mode = iota
-	ModeVisual
-	ModeCommand
+	handleNone handle = iota
+	handleTopLeft
+	handleTop
+	handleTopRight
+	handleRight
+	handleBottomRight
+	handleBottom
+	handleBottomLeft
+	handleLeft
+	handleBody
+	handleNew // dragging out a fresh selection
 )
 
-type GrabHandle int
-
-const (
-	HandleNone GrabHandle = iota
-	HandleTopLeft
-	HandleTop
-	HandleTopRight
-	HandleRight
-	HandleBottomRight
-	HandleBottom
-	HandleBottomLeft
-	HandleLeft
-	HandleBody
-)
-
+// State is the interactive selection and command-line state. All points are
+// in image (and window) coordinates.
 type State struct {
-	Mode         Mode
-	Screenshot   *display.Screenshot
-	Selection    image.Rectangle
-	HasSelection bool
+	Bounds     image.Rectangle
+	Selection  image.Rectangle
+	Command    bool
+	CommandBuf string
+	Message    string
 
-	ActiveHandle GrabHandle
-	DragStart    image.Point
-	InitialRect  image.Rectangle
-
-	CommandBuffer string
-	ErrorMessage  string
+	active handle
+	anchor image.Point     // pointer position at press
+	start  image.Rectangle // selection at press
 }
 
-func NewState(shot *display.Screenshot) *State {
-	return &State{
-		Mode:       ModeNormal,
-		Screenshot: shot,
-	}
+func NewState(bounds image.Rectangle) *State {
+	return &State{Bounds: bounds}
 }
+
+func (s *State) HasSelection() bool { return !s.Selection.Empty() }
 
 func (s *State) ClearSelection() {
 	s.Selection = image.Rectangle{}
-	s.HasSelection = false
-	s.ActiveHandle = HandleNone
-	s.Mode = ModeNormal
+	s.active = handleNone
 }
 
-func (s *State) UpdateSelectionFromDrag(currentPos image.Point) {
-	dx := currentPos.X - s.DragStart.X
-	dy := currentPos.Y - s.DragStart.Y
-
-	if s.ActiveHandle == HandleBody {
-		rect := s.InitialRect.Add(image.Pt(dx, dy))
-		bounds := s.Screenshot.Image.Bounds()
-
-		if rect.Min.X < bounds.Min.X {
-			rect = rect.Add(image.Pt(bounds.Min.X-rect.Min.X, 0))
-		}
-		if rect.Max.X > bounds.Max.X {
-			rect = rect.Add(image.Pt(bounds.Max.X-rect.Max.X, 0))
-		}
-		if rect.Min.Y < bounds.Min.Y {
-			rect = rect.Add(image.Pt(0, bounds.Min.Y-rect.Min.Y))
-		}
-		if rect.Max.Y > bounds.Max.Y {
-			rect = rect.Add(image.Pt(0, bounds.Max.Y-rect.Max.Y))
-		}
-
-		s.Selection = rect
-		return
+// Press starts a drag at p: resizing or moving the selection when p is on
+// it, otherwise starting a new selection.
+func (s *State) Press(p image.Point) {
+	s.Message = ""
+	s.anchor = p
+	s.start = s.Selection
+	s.active = s.handleAt(p)
+	if s.active == handleNone {
+		s.active = handleNew
+		s.Selection = image.Rectangle{}
 	}
-
-	rect := s.InitialRect
-	switch s.ActiveHandle {
-	case HandleTopLeft:
-		rect.Min.X += dx
-		rect.Min.Y += dy
-	case HandleTop:
-		rect.Min.Y += dy
-	case HandleTopRight:
-		rect.Max.X += dx
-		rect.Min.Y += dy
-	case HandleRight:
-		rect.Max.X += dx
-	case HandleBottomRight:
-		rect.Max.X += dx
-		rect.Max.Y += dy
-	case HandleBottom:
-		rect.Max.Y += dy
-	case HandleBottomLeft:
-		rect.Min.X += dx
-		rect.Max.Y += dy
-	case HandleLeft:
-		rect.Min.X += dx
-	}
-
-	s.Selection = canonicalize(rect)
-	s.Mode = ModeVisual
 }
 
-func (s *State) GetHandleAt(pt image.Point, dotSize int) GrabHandle {
-	if !s.HasSelection {
-		return HandleNone
+// Drag updates the selection for pointer position p and reports whether it
+// changed.
+func (s *State) Drag(p image.Point) bool {
+	d := p.Sub(s.anchor)
+	r := s.start
+
+	switch s.active {
+	case handleNone:
+		return false
+	case handleNew:
+		// The selection spans both pointer pixels, inclusive.
+		r = image.Rectangle{s.anchor, p}.Canon()
+		r.Max = r.Max.Add(image.Pt(1, 1))
+	case handleBody:
+		r = r.Add(d)
+		r = r.Add(image.Pt(shiftInto(r.Min.X, r.Max.X, s.Bounds.Min.X, s.Bounds.Max.X),
+			shiftInto(r.Min.Y, r.Max.Y, s.Bounds.Min.Y, s.Bounds.Max.Y)))
+	default:
+		switch s.active {
+		case handleTopLeft, handleLeft, handleBottomLeft:
+			r.Min.X += d.X
+		case handleTopRight, handleRight, handleBottomRight:
+			r.Max.X += d.X
+		}
+		switch s.active {
+		case handleTopLeft, handleTop, handleTopRight:
+			r.Min.Y += d.Y
+		case handleBottomLeft, handleBottom, handleBottomRight:
+			r.Max.Y += d.Y
+		}
 	}
 
-	r := s.Selection
-	midX, midY := r.Min.X+r.Dx()/2, r.Min.Y+r.Dy()/2
-
-	in := func(c image.Point) bool {
-		return pt.X >= c.X-dotSize && pt.X <= c.X+dotSize &&
-			pt.Y >= c.Y-dotSize && pt.Y <= c.Y+dotSize
+	r = r.Canon().Intersect(s.Bounds)
+	if r == s.Selection {
+		return false
 	}
-
-	if in(image.Pt(r.Min.X, r.Min.Y)) {
-		return HandleTopLeft
-	}
-	if in(image.Pt(midX, r.Min.Y)) {
-		return HandleTop
-	}
-	if in(image.Pt(r.Max.X, r.Min.Y)) {
-		return HandleTopRight
-	}
-	if in(image.Pt(r.Max.X, midY)) {
-		return HandleRight
-	}
-	if in(image.Pt(r.Max.X, r.Max.Y)) {
-		return HandleBottomRight
-	}
-	if in(image.Pt(midX, r.Max.Y)) {
-		return HandleBottom
-	}
-	if in(image.Pt(r.Min.X, r.Max.Y)) {
-		return HandleBottomLeft
-	}
-	if in(image.Pt(r.Min.X, midY)) {
-		return HandleLeft
-	}
-	if pt.In(r) {
-		return HandleBody
-	}
-
-	return HandleNone
+	s.Selection = r
+	return true
 }
 
-func canonicalize(r image.Rectangle) image.Rectangle {
-	if r.Min.X > r.Max.X {
-		r.Min.X, r.Max.X = r.Max.X, r.Min.X
+func (s *State) Release() { s.active = handleNone }
+
+// StatusText is the line shown in the bar.
+func (s *State) StatusText() string {
+	switch {
+	case s.Command:
+		return ":" + s.CommandBuf
+	case s.Message != "":
+		return s.Message
+	case s.HasSelection():
+		return fmt.Sprintf("-- VISUAL --  %dx%d", s.Selection.Dx(), s.Selection.Dy())
+	default:
+		return "-- NORMAL --"
 	}
-	if r.Min.Y > r.Max.Y {
-		r.Min.Y, r.Max.Y = r.Max.Y, r.Min.Y
+}
+
+func (s *State) handleAt(p image.Point) handle {
+	if !s.HasSelection() {
+		return handleNone
 	}
-	return r
+	r := config.DotSize
+	for i, c := range handlePoints(s.Selection) {
+		if p.In(image.Rect(c.X-r, c.Y-r, c.X+r+1, c.Y+r+1)) {
+			return handleTopLeft + handle(i)
+		}
+	}
+	if p.In(s.Selection) {
+		return handleBody
+	}
+	return handleNone
+}
+
+// handlePoints returns the grab handle centers of r, in handle order
+// starting at handleTopLeft and going clockwise.
+func handlePoints(r image.Rectangle) [8]image.Point {
+	x0, y0, x1, y1 := r.Min.X, r.Min.Y, r.Max.X-1, r.Max.Y-1
+	mx, my := (x0+x1)/2, (y0+y1)/2
+	return [8]image.Point{
+		{x0, y0}, {mx, y0}, {x1, y0}, {x1, my},
+		{x1, y1}, {mx, y1}, {x0, y1}, {x0, my},
+	}
+}
+
+// shiftInto returns the offset that moves span [lo, hi) inside [min, max).
+func shiftInto(lo, hi, min, max int) int {
+	switch {
+	case lo < min:
+		return min - lo
+	case hi > max:
+		return max - hi
+	}
+	return 0
 }

@@ -3,14 +3,15 @@
 
 include config.mk
 
-
-
-
 all: vshot
 
 vshot:
 	@mkdir -p bin
-	${GO} build ${GOFLAGS} -ldflags "${LDFLAGS}" -o bin/vshot ./cmd/vshot
+	CGO_ENABLED=0 ${GO} build ${GOFLAGS} -ldflags "${LDFLAGS}" -o bin/vshot ./cmd/vshot
+
+test:
+	${GO} vet ./...
+	${GO} test ./...
 
 clean:
 	rm -rf bin
@@ -23,5 +24,4 @@ install: vshot
 uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/bin/vshot
 
-.PHONY: all clean install uninstall
-
+.PHONY: all vshot test clean install uninstall
