@@ -52,18 +52,29 @@ func (a *App) Drag(p image.Point) bool { return a.State.Drag(p) }
 // Release handles a primary button release.
 func (a *App) Release() { a.State.Release() }
 
-// Dimmed returns a copy of img darkened by config.MaskAlpha, for drawing
-// the area outside the selection.
-func Dimmed(img *image.RGBA) *image.RGBA {
-	f := uint32((1 - min(max(config.MaskAlpha, 0), 1)) * 256)
+// Dimmed returns a copy of img with the theme's mask color blended over it,
+// for drawing the area outside the selection.
+func Dimmed(img *image.RGBA, t config.Theme) *image.RGBA {
+	a := uint32(min(max(t.MaskAlpha, 0), 1) * 256)
+	mask := [4]uint32{(t.Mask >> 16 & 0xff) * a, (t.Mask >> 8 & 0xff) * a, (t.Mask & 0xff) * a, 0xff * a}
 	out := image.NewRGBA(img.Rect)
 	n := img.Rect.Dx() * 4
 	for y := img.Rect.Min.Y; y < img.Rect.Max.Y; y++ {
 		src := img.Pix[img.PixOffset(img.Rect.Min.X, y):][:n]
 		dst := out.Pix[out.PixOffset(img.Rect.Min.X, y):][:n]
 		for i, v := range src {
-			dst[i] = uint8(uint32(v) * f >> 8)
+			dst[i] = uint8((uint32(v)*(256-a) + mask[i%4]) >> 8)
 		}
 	}
 	return out
+}
+
+// BorderRects returns the four edges of a border of width w inside r.
+func BorderRects(r image.Rectangle, w int) [4]image.Rectangle {
+	return [4]image.Rectangle{
+		{r.Min, image.Pt(r.Max.X, r.Min.Y+w)},
+		{image.Pt(r.Min.X, r.Max.Y-w), r.Max},
+		{r.Min, image.Pt(r.Min.X+w, r.Max.Y)},
+		{image.Pt(r.Max.X-w, r.Min.Y), r.Max},
+	}
 }

@@ -52,7 +52,7 @@ func (v *view) setApp(app *ui.App, rect image.Rectangle) {
 	v.scale = max(1, int(math.Round(float64(rect.Dx())/float64(v.w))))
 	app.State.Scale = v.scale
 	v.bright = toBGRX(app.Image, rect)
-	v.dim = toBGRX(ui.Dimmed(app.Image.SubImage(rect).(*image.RGBA)), rect)
+	v.dim = toBGRX(ui.Dimmed(app.Image.SubImage(rect).(*image.RGBA), config.WaylandTheme), rect)
 	v.dirty = true
 }
 
@@ -104,6 +104,7 @@ func (v *view) draw() error {
 }
 
 func (v *view) paint(buf *shmBuffer) {
+	theme := config.WaylandTheme
 	c := canvas{buf.data, buf.stride, buf.width, buf.height}
 	copy(c.pix, v.dim)
 
@@ -117,20 +118,18 @@ func (v *view) paint(buf *shmBuffer) {
 			}
 		}
 
-		k := v.scale
-		c.fill(image.Rect(sel.Min.X, sel.Min.Y, sel.Max.X, sel.Min.Y+k), config.BorderColor)
-		c.fill(image.Rect(sel.Min.X, sel.Max.Y-k, sel.Max.X, sel.Max.Y), config.BorderColor)
-		c.fill(image.Rect(sel.Min.X, sel.Min.Y, sel.Min.X+k, sel.Max.Y), config.BorderColor)
-		c.fill(image.Rect(sel.Max.X-k, sel.Min.Y, sel.Max.X, sel.Max.Y), config.BorderColor)
+		for _, e := range ui.BorderRects(sel, theme.BorderWidth*v.scale) {
+			c.fill(e.Intersect(sel), theme.Border)
+		}
 		for _, p := range ui.HandlePoints(sel) {
-			c.circle(p, config.DotSize*k, config.BorderColor)
+			c.circle(p, config.DotSize*v.scale, theme.Border)
 		}
 	}
 
 	k := v.scale
 	barY := c.h - ui.BarHeight*k
-	c.fill(image.Rect(0, barY, c.w, c.h), config.BarColor)
-	c.text(st.StatusText(), barTextX*k, barY, k)
+	c.fill(image.Rect(0, barY, c.w, c.h), theme.Bar)
+	c.text(st.StatusText(), barTextX*k, barY, k, theme.Text)
 }
 
 // canvas draws into a B, G, R, X pixel buffer.
@@ -169,14 +168,14 @@ func (c canvas) circle(center image.Point, radius int, rgb uint32) {
 }
 
 // text draws s with a bitmap font scaled by k, in a bar whose top is barY.
-func (c canvas) text(s string, x, barY, k int) {
+func (c canvas) text(s string, x, barY, k int, rgb uint32) {
 	mask := image.NewAlpha(image.Rect(0, 0, (c.w-x)/k, ui.BarHeight))
 	d := font.Drawer{Dst: mask, Src: image.Opaque, Face: basicfont.Face7x13, Dot: fixed.P(0, barBaseline)}
 	d.DrawString(s)
 	for my := range mask.Rect.Dy() {
 		for mx := range mask.Rect.Dx() {
 			if mask.AlphaAt(mx, my).A >= 0x80 {
-				c.fill(image.Rect(x+mx*k, barY+my*k, x+(mx+1)*k, barY+(my+1)*k), config.TextColor)
+				c.fill(image.Rect(x+mx*k, barY+my*k, x+(mx+1)*k, barY+(my+1)*k), rgb)
 			}
 		}
 	}
