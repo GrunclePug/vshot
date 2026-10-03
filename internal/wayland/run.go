@@ -65,7 +65,15 @@ func Main(all bool) error {
 	}
 	defer c.close()
 
-	s := &session{c: c}
+	// The keymap must exist before the seat is bound: the compositor sends
+	// keyboard events as soon as a keyboard is available.
+	keys, err := newKeymap()
+	if err != nil {
+		return err
+	}
+	defer keys.free()
+
+	s := &session{c: c, keys: keys}
 	if err := s.bindGlobals(); err != nil {
 		return err
 	}
@@ -77,11 +85,6 @@ func Main(all bool) error {
 			return err
 		}
 	}
-
-	if s.keys, err = newKeymap(); err != nil {
-		return err
-	}
-	defer s.keys.free()
 
 	if err := s.createViews(); err != nil {
 		return err
@@ -398,7 +401,7 @@ func (s *session) handleKeyboard(op uint16, m *msg) {
 		m.uint() // serial
 		m.uint() // time
 		key, state := m.uint(), m.uint()
-		if state != 1 {
+		if state != 1 || len(s.views) == 0 { // ignore presses while still capturing
 			return
 		}
 		v := s.pointerView

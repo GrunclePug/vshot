@@ -1,13 +1,17 @@
-# vshot - An X11-native screen selection and capture tool.
+# vshot - A screen selection and capture tool for X11 and Wayland.
 # See LICENSE file for copyright and license details.
 
 include config.mk
 
-all: vshot
+SRC = $(shell find cmd internal -name '*.go') go.mod go.sum config.mk
 
-vshot:
+all: bin/vshot
+
+# A real file target, so `sudo make install` after `make` only copies and
+# doesn't rebuild as root.
+bin/vshot: ${SRC}
 	@mkdir -p bin
-	${GO} build ${GOFLAGS} -ldflags "${LDFLAGS}" -o bin/vshot ./cmd/vshot
+	${GO} build ${GOFLAGS} -ldflags "${LDFLAGS}" -o $@ ./cmd/vshot
 
 test:
 	${GO} vet ./...
@@ -16,7 +20,7 @@ test:
 clean:
 	rm -rf bin
 
-install: vshot
+install: bin/vshot
 	@mkdir -p $(DESTDIR)$(PREFIX)/bin
 	cp -f bin/vshot $(DESTDIR)$(PREFIX)/bin
 	@chmod 755 $(DESTDIR)$(PREFIX)/bin/vshot
@@ -24,4 +28,4 @@ install: vshot
 uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/bin/vshot
 
-.PHONY: all vshot test clean install uninstall
+.PHONY: all test clean install uninstall
