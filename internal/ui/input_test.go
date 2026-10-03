@@ -25,10 +25,10 @@ func TestParseCommand(t *testing.T) {
 }
 
 func TestUnknownCommandDoesNotSave(t *testing.T) {
-	a := &app{st: NewState(bounds)}
+	a := &App{State: NewState(bounds)}
 	a.execute("wat")
-	if a.quit || a.st.Message != "Not an editor command: wat" {
-		t.Fatalf("quit=%v message=%q", a.quit, a.st.Message)
+	if a.quit || a.State.Message != "Not an editor command: wat" {
+		t.Fatalf("quit=%v message=%q", a.quit, a.State.Message)
 	}
 }
 
