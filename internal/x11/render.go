@@ -27,7 +27,7 @@ func newRenderer(s *Session, img *image.RGBA) (*renderer, error) {
 	if err != nil {
 		return nil, err
 	}
-	dim, err := s.UploadImage(ui.Dimmed(img))
+	dim, err := s.UploadImage(ui.Dimmed(img, config.X11Theme))
 	if err != nil {
 		return nil, err
 	}
@@ -40,6 +40,7 @@ func newRenderer(s *Session, img *image.RGBA) (*renderer, error) {
 
 func (r *renderer) draw(st *ui.State) {
 	X, gc, back := r.s.X, r.s.GC, xproto.Drawable(r.back)
+	theme := config.X11Theme
 
 	xproto.CopyArea(X, xproto.Drawable(r.dim), back, gc, 0, 0, 0, 0, uint16(r.s.Width), uint16(r.s.Height))
 
@@ -47,8 +48,14 @@ func (r *renderer) draw(st *ui.State) {
 		x, y, w, h := int16(sel.Min.X), int16(sel.Min.Y), uint16(sel.Dx()), uint16(sel.Dy())
 		xproto.CopyArea(X, xproto.Drawable(r.bright), back, gc, x, y, x, y, w, h)
 
-		xproto.ChangeGC(X, gc, xproto.GcForeground, []uint32{config.BorderColor})
-		xproto.PolyRectangle(X, back, gc, []xproto.Rectangle{{X: x, Y: y, Width: w - 1, Height: h - 1}})
+		xproto.ChangeGC(X, gc, xproto.GcForeground, []uint32{theme.Border})
+		var edges []xproto.Rectangle
+		for _, e := range ui.BorderRects(sel, theme.BorderWidth) {
+			if e = e.Intersect(sel); !e.Empty() {
+				edges = append(edges, xproto.Rectangle{X: int16(e.Min.X), Y: int16(e.Min.Y), Width: uint16(e.Dx()), Height: uint16(e.Dy())})
+			}
+		}
+		xproto.PolyFillRectangle(X, back, gc, edges)
 
 		rad := config.DotSize
 		arcs := make([]xproto.Arc, 0, 8)
@@ -66,11 +73,11 @@ func (r *renderer) draw(st *ui.State) {
 	if len(text) > 255 {
 		text = text[:255]
 	}
-	xproto.ChangeGC(X, gc, xproto.GcForeground|xproto.GcBackground, []uint32{config.BarColor, config.BarColor})
+	xproto.ChangeGC(X, gc, xproto.GcForeground|xproto.GcBackground, []uint32{theme.Bar, theme.Bar})
 	xproto.PolyFillRectangle(X, back, gc, []xproto.Rectangle{
 		{X: 0, Y: int16(r.barY), Width: uint16(r.s.Width), Height: ui.BarHeight},
 	})
-	xproto.ChangeGC(X, gc, xproto.GcForeground, []uint32{config.TextColor})
+	xproto.ChangeGC(X, gc, xproto.GcForeground, []uint32{theme.Text})
 	xproto.ImageText8(X, byte(len(text)), back, gc, barTextX, int16(r.barY+barBaseline), text)
 
 	r.present()

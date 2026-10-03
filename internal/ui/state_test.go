@@ -3,6 +3,8 @@ package ui
 import (
 	"image"
 	"testing"
+
+	"github.com/grunclepug/vshot/internal/config"
 )
 
 var bounds = image.Rect(0, 0, 100, 100)
@@ -70,5 +72,20 @@ func TestMotionWithoutPressIsIgnored(t *testing.T) {
 	s := NewState(bounds)
 	if s.Drag(image.Pt(5, 5)) || s.HasSelection() {
 		t.Fatal("drag without press changed state")
+	}
+}
+
+func TestDimmedBlendsTowardMask(t *testing.T) {
+	img := image.NewRGBA(image.Rect(0, 0, 2, 1))
+	copy(img.Pix, []byte{0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0xff})
+	theme := config.Theme{Mask: 0x204060, MaskAlpha: 0.5}
+
+	got := Dimmed(img.SubImage(image.Rect(1, 0, 2, 1)).(*image.RGBA), theme).Pix[:4]
+	if want := []byte{0x10, 0x20, 0x30, 0xff}; string(got) != string(want) {
+		t.Errorf("black pixel = %x, want %x", got, want)
+	}
+	got = Dimmed(img, theme).Pix[:4]
+	if want := []byte{0x8f, 0x9f, 0xaf, 0xff}; string(got) != string(want) {
+		t.Errorf("white pixel = %x, want %x", got, want)
 	}
 }

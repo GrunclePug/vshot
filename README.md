@@ -65,14 +65,27 @@ sudo make install    # installs to /usr/local/bin
 Settings are compiled in. Edit `internal/config/config.go` and rebuild:
 
 ```go
-BorderColor     uint32  = 0xFF00FF
-BarColor        uint32  = 0x222222
-TextColor       uint32  = 0xbbbbbb
-MaskAlpha       float64 = 0.5
-DotSize         int     = 4
-DefaultDir              = "~/Pictures/Screenshots"
-TimestampFormat         = "Screenshot_2006-01-02_150405.png"
+DotSize         int = 4 // grab handle radius
+DefaultDir          = "~/Pictures/Screenshots"
+TimestampFormat     = "Screenshot_2006-01-02_150405.png"
 ```
+
+X11 and Wayland each have their own theme, so vshot can match each desktop:
+
+```go
+X11Theme = Theme{
+	Border: 0xFF00FF, BorderWidth: 1,
+	Bar: 0x222222, Text: 0xbbbbbb,
+	Mask: 0x000000, MaskAlpha: 0.5,
+}
+WaylandTheme = Theme{
+	Border: 0x5fd4c4, BorderWidth: 2,
+	Bar: 0x0e141a, Text: 0xe6edf0,
+	Mask: 0x0e141a, MaskAlpha: 0.5,
+}
+```
+
+`Mask` is blended over everything outside the selection at strength `MaskAlpha`. Sizes are in logical pixels and scale with HiDPI outputs on Wayland.
 
 ## Contributing
 
