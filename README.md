@@ -1,20 +1,28 @@
 # vshot
 
-vshot - An X11-native screen selection and capture tool.
+vshot - A screen selection and capture tool for X11 and Wayland.
 
 ## Overview
 
-`vshot` freezes the screen, lets you select a region with the mouse, and saves it or copies it to the clipboard with vim-style keys. It speaks the X11 protocol directly through the pure-Go [`xgb`](https://github.com/jezek/xgb) library, with no cgo or toolkit dependencies.
+`vshot` freezes the screen, lets you select a region with the mouse, and saves it or copies it to the clipboard with vim-style keys. One binary works on both X11 and wlroots-based Wayland compositors, speaking each protocol directly with no toolkit.
+
+* **X11:** any window manager (dwm, i3, bspwm, ...), via the pure-Go [`xgb`](https://github.com/jezek/xgb) library.
+* **Wayland:** compositors with `wlr-screencopy` and `wlr-layer-shell` (river, sway, Hyprland, ...). GNOME and KDE are not supported.
+
+The backend is picked automatically: Wayland when `WAYLAND_DISPLAY` is set, otherwise X11.
 
 ## Usage
 
 ```bash
 vshot          # capture the monitor under the pointer
-vshot -all     # capture all monitors
+vshot -all     # capture all monitors as one image
+vshot -backend x11|wayland   # override backend detection
 vshot -v       # print version
 ```
 
 Bind it to a hotkey in your window manager for quick captures.
+
+On Wayland every monitor shows the overlay, and keys act on the monitor under the pointer. With `-all`, selections can span monitors; this requires all monitors to use the same scale. Rotated monitors are not supported yet.
 
 ### Controls
 
@@ -36,10 +44,10 @@ Without a file name, `:w` writes a timestamped file to `DefaultDir`, creating it
 
 ### Requirements
 
-* Go 1.22+
-* Make
-* `xclip` for clipboard support
-* An X server with a 24- or 32-bit TrueColor display (practically every modern setup)
+* Go 1.22+, a C compiler, `pkg-config` and Make
+* `libxkbcommon` (keyboard layouts on Wayland; installed on virtually every Linux desktop)
+* Clipboard: `xclip` on X11, `wl-clipboard` (`wl-copy`) on Wayland
+* X11: a 24- or 32-bit TrueColor display (practically every modern setup)
 
 ### Building
 

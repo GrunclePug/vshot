@@ -7,7 +7,7 @@ all: vshot
 
 vshot:
 	@mkdir -p bin
-	CGO_ENABLED=0 ${GO} build ${GOFLAGS} -ldflags "${LDFLAGS}" -o bin/vshot ./cmd/vshot
+	${GO} build ${GOFLAGS} -ldflags "${LDFLAGS}" -o bin/vshot ./cmd/vshot
 
 test:
 	${GO} vet ./...

@@ -31,6 +31,7 @@ type State struct {
 	Command    bool
 	CommandBuf string
 	Message    string
+	Scale      int // device pixels per UI pixel, for handle hit testing
 
 	active handle
 	anchor image.Point     // pointer position at press
@@ -38,7 +39,7 @@ type State struct {
 }
 
 func NewState(bounds image.Rectangle) *State {
-	return &State{Bounds: bounds}
+	return &State{Bounds: bounds, Scale: 1}
 }
 
 func (s *State) HasSelection() bool { return !s.Selection.Empty() }
@@ -121,7 +122,7 @@ func (s *State) handleAt(p image.Point) handle {
 	if !s.HasSelection() {
 		return handleNone
 	}
-	r := config.DotSize
+	r := config.DotSize * max(s.Scale, 1)
 	for i, c := range HandlePoints(s.Selection) {
 		if p.In(image.Rect(c.X-r, c.Y-r, c.X+r+1, c.Y+r+1)) {
 			return handleTopLeft + handle(i)

@@ -25,6 +25,9 @@ func Main(all bool) error {
 	// Capture before any window of ours is mapped, so it can't appear in the shot.
 	img, bounds, err := Capture(X, all)
 	if err != nil {
+		if os.Getenv("WAYLAND_DISPLAY") != "" {
+			return fmt.Errorf("capture: %w (XWayland can't read the screen; use -backend wayland)", err)
+		}
 		return fmt.Errorf("capture: %w", err)
 	}
 
@@ -78,7 +81,7 @@ func handle(s *Session, r *renderer, a *ui.App, ev xgb.Event) bool {
 			r.present()
 		}
 	case xproto.ButtonPressEvent:
-		if e.Detail == xproto.ButtonIndex1 {
+		if e.Detail == xproto.ButtonIndex1 && int(e.EventY) < r.barY {
 			return a.Press(image.Pt(int(e.EventX), int(e.EventY)))
 		}
 	case xproto.MotionNotifyEvent:
