@@ -15,15 +15,15 @@ import (
 )
 
 // target is the image that save and yank act on.
-func (a *app) target() image.Image {
-	if a.st.HasSelection() {
-		return a.img.SubImage(a.st.Selection)
+func (a *App) target() image.Image {
+	if a.State.HasSelection() {
+		return a.Image.SubImage(a.State.Selection)
 	}
-	return a.img
+	return a.Image
 }
 
 // save writes the target as a PNG and returns the path written.
-func (a *app) save(arg string) (string, error) {
+func (a *App) save(arg string) (string, error) {
 	path, err := resolvePath(arg, time.Now())
 	if err != nil {
 		return "", err
@@ -39,9 +39,9 @@ func (a *app) save(arg string) (string, error) {
 
 // yank copies the target to the clipboard and quits. On failure it stays
 // open and shows the error.
-func (a *app) yank() {
-	if err := copyToClipboard(a.target()); err != nil {
-		a.st.Message = "Error: " + err.Error()
+func (a *App) yank() {
+	if err := copyToClipboard(a.clipboard, a.target()); err != nil {
+		a.State.Message = "Error: " + err.Error()
 		return
 	}
 	a.quit = true
@@ -60,18 +60,18 @@ func writePNG(path string, img image.Image) error {
 	return f.Close()
 }
 
-func copyToClipboard(img image.Image) error {
+func copyToClipboard(argv []string, img image.Image) error {
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, img); err != nil {
 		return err
 	}
-	// xclip takes ownership of the selection, then forks a child that keeps
-	// serving it after we exit. Its stdout/stderr must not be pipes, or Run
-	// would block until something else takes the clipboard.
-	cmd := exec.Command("xclip", "-selection", "clipboard", "-t", "image/png")
+	// xclip and wl-copy take ownership of the clipboard, then fork a child
+	// that keeps serving it after we exit. Its stdout/stderr must not be
+	// pipes, or Run would block until something else takes the clipboard.
+	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Stdin = &buf
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("xclip: %w", err)
+		return fmt.Errorf("%s: %w", argv[0], err)
 	}
 	return nil
 }

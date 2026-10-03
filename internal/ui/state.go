@@ -122,7 +122,7 @@ func (s *State) handleAt(p image.Point) handle {
 		return handleNone
 	}
 	r := config.DotSize
-	for i, c := range handlePoints(s.Selection) {
+	for i, c := range HandlePoints(s.Selection) {
 		if p.In(image.Rect(c.X-r, c.Y-r, c.X+r+1, c.Y+r+1)) {
 			return handleTopLeft + handle(i)
 		}
@@ -133,9 +133,9 @@ func (s *State) handleAt(p image.Point) handle {
 	return handleNone
 }
 
-// handlePoints returns the grab handle centers of r, in handle order
+// HandlePoints returns the grab handle centers of r, in handle order
 // starting at handleTopLeft and going clockwise.
-func handlePoints(r image.Rectangle) [8]image.Point {
+func HandlePoints(r image.Rectangle) [8]image.Point {
 	x0, y0, x1, y1 := r.Min.X, r.Min.Y, r.Max.X-1, r.Max.Y-1
 	mx, my := (x0+x1)/2, (y0+y1)/2
 	return [8]image.Point{

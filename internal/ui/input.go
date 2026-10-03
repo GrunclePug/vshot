@@ -3,26 +3,18 @@ package ui
 import (
 	"fmt"
 	"strings"
-
-	"github.com/jezek/xgb/xproto"
 )
 
-const (
-	xkBackSpace xproto.Keysym = 0xff08
-	xkReturn    xproto.Keysym = 0xff0d
-	xkEscape    xproto.Keysym = 0xff1b
-	xkKPEnter   xproto.Keysym = 0xff8d
-)
-
-func (a *app) key(sym xproto.Keysym) {
-	st := a.st
+// Key handles a key press, translated to a keysym by the backend.
+func (a *App) Key(sym Keysym) {
+	st := a.State
 	if st.Command {
 		a.commandKey(sym)
 		return
 	}
 
 	switch sym {
-	case xkEscape:
+	case KeyEscape:
 		if st.HasSelection() {
 			st.ClearSelection()
 			st.Message = ""
@@ -36,15 +28,15 @@ func (a *app) key(sym xproto.Keysym) {
 	}
 }
 
-func (a *app) commandKey(sym xproto.Keysym) {
-	st := a.st
+func (a *App) commandKey(sym Keysym) {
+	st := a.State
 	switch {
-	case sym == xkEscape:
+	case sym == KeyEscape:
 		st.Command = false
-	case sym == xkReturn || sym == xkKPEnter:
+	case sym == KeyReturn || sym == KeyKPEnter:
 		st.Command = false
 		a.execute(st.CommandBuf)
-	case sym == xkBackSpace:
+	case sym == KeyBackSpace:
 		if st.CommandBuf == "" {
 			st.Command = false
 		} else {
@@ -60,7 +52,7 @@ func (a *app) commandKey(sym xproto.Keysym) {
 //	:w [file]       save the selection (or whole capture)
 //	:wq [file], :x  save, then quit if saving succeeded
 //	:q, :q!         quit
-func (a *app) execute(line string) {
+func (a *App) execute(line string) {
 	cmd, arg := parseCommand(line)
 	switch cmd {
 	case "":
@@ -69,13 +61,13 @@ func (a *app) execute(line string) {
 	case "w", "wq", "x":
 		path, err := a.save(arg)
 		if err != nil {
-			a.st.Message = "Error: " + err.Error()
+			a.State.Message = "Error: " + err.Error()
 			return
 		}
-		a.st.Message = "Saved " + path
+		a.State.Message = "Saved " + path
 		a.quit = cmd != "w"
 	default:
-		a.st.Message = fmt.Sprintf("Not an editor command: %s", cmd)
+		a.State.Message = fmt.Sprintf("Not an editor command: %s", cmd)
 	}
 }
 
