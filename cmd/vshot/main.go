@@ -5,50 +5,49 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/grunclepug/vshot/internal/display"
 	"github.com/grunclepug/vshot/internal/ui"
 	"github.com/grunclepug/vshot/internal/x11"
-
-	"github.com/jezek/xgb/xproto"
+	"github.com/jezek/xgb"
 )
 
 var Version = "dev"
 
 func main() {
-	allDisplays := flag.Bool("all", false, "Capture all active displays")
-	showVersion := flag.Bool("v", false, "Print version")
+	all := flag.Bool("all", false, "capture all monitors instead of the one under the pointer")
+	version := flag.Bool("v", false, "print version and exit")
 	flag.Parse()
-
-	if *showVersion {
-		fmt.Printf("vshot version %s\n", Version)
-		os.Exit(0)
+	if flag.NArg() > 0 {
+		flag.Usage()
+		os.Exit(2)
 	}
 
-	session, err := x11.NewSession()
+	if *version {
+		fmt.Println("vshot", Version)
+		return
+	}
+
+	if err := run(*all); err != nil {
+		fmt.Fprintln(os.Stderr, "vshot:", err)
+		os.Exit(1)
+	}
+}
+
+func run(all bool) error {
+	X, err := xgb.NewConn()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "X11 connection failed: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("connect to X server: %w", err)
 	}
-	defer session.X.Close()
+	defer X.Close()
 
-	shot, err := display.CaptureScreen(session.X, *allDisplays)
+	// Capture before any window of ours is mapped, so it can't appear in the shot.
+	img, bounds, err := x11.Capture(X, all)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Capture error: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("capture: %w", err)
 	}
 
-	if err := session.GrabInput(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+	s, err := x11.NewSession(X, bounds)
+	if err != nil {
+		return err
 	}
-	defer xproto.UngrabPointer(session.X, xproto.TimeCurrentTime)
-	defer xproto.UngrabKeyboard(session.X, xproto.TimeCurrentTime)
-
-	state := ui.NewState(shot)
-	canvas := ui.NewCanvas(session.Width, session.Height)
-	bar := ui.NewBarRenderer()
-	renderer := ui.NewRenderer(session, bar)
-
-	renderer.Redraw(state, canvas)
-	ui.RunEventLoop(session, state, canvas, renderer)
+	return ui.Run(s, img)
 }

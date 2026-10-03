@@ -4,45 +4,58 @@ vshot - An X11-native screen selection and capture tool.
 
 ## Overview
 
-`vshot` is a lightweight, X11-native tool designed for precise screen region selection and capture. It communicates directly with the X Server, providing a highly responsive experience without the bloat of higher-level windowing toolkits.
-
-## Features
-
-* **X11-Native:** Interfaces directly with the X11 protocol via `xgb` for minimal overhead.
-* **Interactive Selection:** Intuitive click-and-drag interface to define capture regions.
-* **Persistent State:** Uses a dedicated controller to manage selection state and user interactions smoothly.
-* **Modular Architecture:** Clearly separated hardware interaction, UI rendering, and business logic.
-* **Minimal:** No heavy dependencies; optimized for performance on X11 desktop environments.
+`vshot` freezes the screen, lets you select a region with the mouse, and saves it or copies it to the clipboard with vim-style keys. It speaks the X11 protocol directly through the pure-Go [`xgb`](https://github.com/jezek/xgb) library, with no cgo or toolkit dependencies.
 
 ## Usage
 
-You can run the compiled binary directly to start the interactive selection session.
-
 ```bash
-# Capture a single screen
-./bin/vshot
-
-# Capture across all connected displays
-./bin/vshot -all
-
-# Check version
-./bin/vshot -v
+vshot          # capture the monitor under the pointer
+vshot -all     # capture all monitors
+vshot -v       # print version
 ```
 
-### Installation
+Bind it to a hotkey in your window manager for quick captures.
 
-#### Requirements
+### Controls
 
-* Go 1.22+ (Required for range over int support)
+| Input            | Action                                                       |
+| ---------------- | ------------------------------------------------------------ |
+| Click and drag   | Select a region                                              |
+| Drag a handle    | Resize the selection                                         |
+| Drag inside      | Move the selection                                           |
+| Click outside    | Clear the selection                                          |
+| `y`              | Copy the selection (or whole capture) to the clipboard and exit |
+| `Esc`            | Clear the selection, or exit if there is none                |
+| `:w [file]`      | Save the selection (or whole capture) as PNG                 |
+| `:wq [file]`, `:x` | Save, then exit if saving succeeded                        |
+| `:q`             | Exit                                                         |
+
+Without a file name, `:w` writes a timestamped file to `DefaultDir`, creating it if needed. Relative names are also placed in `DefaultDir`; absolute paths and `~/` work as expected.
+
+## Installation
+
+### Requirements
+
+* Go 1.22+
 * Make
-* Clipboard Utility: `xclip` (preferred) or `xsel` (fallback)
-* X11 development headers:
- * Arch Linux : `sudo pacman -S libx11`
- * Debian/Ubuntu: `sudo apt install libx11-dev
+* `xclip` for clipboard support
+* An X server with a 24- or 32-bit TrueColor display (practically every modern setup)
 
-#### Configuration
+### Building
 
-Modify the following options in internal/config/config.go
+```bash
+git clone https://github.com/GrunclePug/vshot.git
+cd vshot
+make
+sudo make install    # installs to /usr/local/bin
+```
+
+`make test` runs vet and the unit tests; `make clean` and `sudo make uninstall` undo the above.
+
+### Configuration
+
+Settings are compiled in. Edit `internal/config/config.go` and rebuild:
+
 ```go
 BorderColor     uint32  = 0xFF00FF
 BarColor        uint32  = 0x222222
@@ -53,28 +66,9 @@ DefaultDir              = "~/Pictures/Screenshots"
 TimestampFormat         = "Screenshot_2006-01-02_150405.png"
 ```
 
-#### Building
-
-Clone the repository:
-`git clone https://github.com/GrunclePug/vshot.git`
-
-Compile the application:
-`make`
-
-Install to system:
-`sudo make install` (Defaults to /usr/local/bin)
-
-#### Maintenance
-
-Clean build artifacts:
-`make clean`
-
-Uninstall from system:
-`sudo make uninstall`
-
 ## Contributing
 
-Contributions are welcome! If you'd like to contribute to this project, please fork the repository and submit a pull request.
+Contributions are welcome! Fork the repository and submit a pull request.
 
 ## Author
 
