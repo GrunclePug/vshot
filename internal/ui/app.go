@@ -40,11 +40,8 @@ func NewApp(img *image.RGBA, clipboard []string) *App {
 func (a *App) Done() bool { return a.quit }
 
 // Press handles a primary button press at p and reports whether a redraw is
-// needed. Presses on the status bar are ignored.
+// needed. Backends ignore presses on their status bar before calling it.
 func (a *App) Press(p image.Point) bool {
-	if p.Y >= a.Image.Rect.Max.Y-BarHeight {
-		return false
-	}
 	a.State.Press(p)
 	return true
 }
@@ -60,8 +57,13 @@ func (a *App) Release() { a.State.Release() }
 func Dimmed(img *image.RGBA) *image.RGBA {
 	f := uint32((1 - min(max(config.MaskAlpha, 0), 1)) * 256)
 	out := image.NewRGBA(img.Rect)
-	for i, v := range img.Pix {
-		out.Pix[i] = uint8(uint32(v) * f >> 8)
+	n := img.Rect.Dx() * 4
+	for y := img.Rect.Min.Y; y < img.Rect.Max.Y; y++ {
+		src := img.Pix[img.PixOffset(img.Rect.Min.X, y):][:n]
+		dst := out.Pix[out.PixOffset(img.Rect.Min.X, y):][:n]
+		for i, v := range src {
+			dst[i] = uint8(uint32(v) * f >> 8)
+		}
 	}
 	return out
 }
