@@ -22,7 +22,7 @@ vshot -v       # print version
 
 Bind it to a hotkey in your window manager for quick captures.
 
-On Wayland every monitor shows the overlay, and keys act on the monitor under the pointer. With `-all`, selections can span monitors; this requires all monitors to use the same scale. Rotated monitors are not supported yet.
+On Wayland every monitor shows the overlay. Keys act on the monitor under the pointer, which is the one showing the status bar. With `-all`, every monitor shows the status bar and selections can span monitors; this requires all monitors to use the same scale. Rotated monitors are not supported yet.
 
 ### Controls
 

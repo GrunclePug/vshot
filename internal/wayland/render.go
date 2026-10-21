@@ -63,8 +63,12 @@ func (v *view) appPoint() image.Point {
 	return v.rect.Min.Add(image.Pt(x, y))
 }
 
+// hasBar reports whether v shows the status bar: every view when they share
+// one app, otherwise only the view that keys act on.
+func (v *view) hasBar() bool { return v.s.all || v == v.s.active }
+
 func (v *view) onBar() bool {
-	return v.appPoint().Y-v.rect.Min.Y >= v.rect.Dy()-ui.BarHeight*v.scale
+	return v.hasBar() && v.appPoint().Y-v.rect.Min.Y >= v.rect.Dy()-ui.BarHeight*v.scale
 }
 
 // draw renders and commits a frame if one is needed and the compositor is
@@ -126,6 +130,9 @@ func (v *view) paint(buf *shmBuffer) {
 		}
 	}
 
+	if !v.hasBar() {
+		return
+	}
 	k := v.scale
 	barY := c.h - ui.BarHeight*k
 	c.fill(image.Rect(0, barY, c.w, c.h), theme.Bar)
