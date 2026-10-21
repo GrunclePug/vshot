@@ -62,7 +62,8 @@ func NewSession(X *xgb.Conn, bounds image.Rectangle) (*Session, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create window: %w", err)
 	}
-	xproto.CreateGC(X, s.GC, xproto.Drawable(s.Win), 0, nil)
+	// Without this every CopyArea in a redraw answers with a NoExposure event.
+	xproto.CreateGC(X, s.GC, xproto.Drawable(s.Win), xproto.GcGraphicsExposures, []uint32{0})
 
 	if font, err := xproto.NewFontId(X); err == nil {
 		xproto.OpenFont(X, font, uint16(len("cursor")), "cursor")

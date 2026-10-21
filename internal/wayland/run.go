@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/grunclepug/vshot/internal/ui"
+	"golang.org/x/sys/unix"
 )
 
 // Clipboard is the command the Wayland backend uses to copy PNG data.
@@ -48,13 +49,15 @@ type session struct {
 	screencopy, screencopyVersion, seatVersion                 uint32
 	outputs                                                    []*output
 
-	views                []*view
-	pointer, cursorDev   uint32
-	keyboard             uint32
-	keys                 *keymap
-	pointerView, kbdView *view
-	pressApp             *ui.App
-	err                  error
+	all                bool // one app spans every output
+	views              []*view
+	pointer, cursorDev uint32
+	keyboard           uint32
+	keys               *keymap
+	pointerView        *view
+	active             *view // the view keys act on
+	pressApp           *ui.App
+	err                error
 }
 
 // Main runs vshot on the compositor named by $WAYLAND_DISPLAY.
@@ -73,7 +76,7 @@ func Main(all bool) error {
 	}
 	defer keys.free()
 
-	s := &session{c: c, keys: keys}
+	s := &session{c: c, keys: keys, all: all}
 	if err := s.bindGlobals(); err != nil {
 		return err
 	}
@@ -89,7 +92,7 @@ func Main(all bool) error {
 	if err := s.createViews(); err != nil {
 		return err
 	}
-	if err := s.assignApps(shots, all); err != nil {
+	if err := s.assignApps(shots); err != nil {
 		return err
 	}
 	return s.loop()
@@ -228,8 +231,8 @@ func (s *session) createViews() error {
 
 // assignApps connects views to apps: one per output, or with all set a
 // single app over every output arranged as in the compositor layout.
-func (s *session) assignApps(shots []*image.RGBA, all bool) error {
-	if !all {
+func (s *session) assignApps(shots []*image.RGBA) error {
+	if !s.all {
 		for i, v := range s.views {
 			v.setApp(ui.NewApp(shots[i], Clipboard), shots[i].Bounds())
 		}
@@ -294,6 +297,19 @@ func (s *session) redraw(app *ui.App) {
 	}
 }
 
+// activate makes v the view that keys act on: the one under the pointer,
+// or until the pointer has entered one, the one with keyboard focus. When
+// each output has its own app, only the active view shows the status bar.
+func (s *session) activate(v *view) {
+	if v == nil || v == s.active {
+		return
+	}
+	if s.active != nil {
+		s.active.dirty = true
+	}
+	s.active, v.dirty = v, true
+}
+
 func (s *session) viewFor(surface uint32) *view {
 	for _, v := range s.views {
 		if v.surface == surface {
@@ -345,6 +361,7 @@ func (s *session) handlePointer(op uint16, m *msg) {
 	case 0: // enter
 		serial, surface := m.uint(), m.uint()
 		s.pointerView = s.viewFor(surface)
+		s.activate(s.pointerView)
 		if s.cursorDev != 0 {
 			s.c.send(s.cursorDev, 1, serial, uint32(shapeCrosshair)) // set_shape
 		}
@@ -389,6 +406,9 @@ func (s *session) handleKeyboard(op uint16, m *msg) {
 	case 0: // keymap
 		format, f, size := m.uint(), m.fd(), m.uint()
 		if format != keymapXKBv1 {
+			if f >= 0 {
+				unix.Close(f)
+			}
 			return
 		}
 		if err := s.keys.load(f, size); err != nil {
@@ -396,7 +416,9 @@ func (s *session) handleKeyboard(op uint16, m *msg) {
 		}
 	case 1: // enter
 		m.uint() // serial
-		s.kbdView = s.viewFor(m.uint())
+		if v := s.viewFor(m.uint()); s.pointerView == nil {
+			s.activate(v)
+		}
 	case 3: // key
 		m.uint() // serial
 		m.uint() // time
@@ -404,14 +426,10 @@ func (s *session) handleKeyboard(op uint16, m *msg) {
 		if state != 1 || len(s.views) == 0 { // ignore presses while still capturing
 			return
 		}
-		v := s.pointerView
-		if v == nil {
-			v = s.kbdView
+		if s.active == nil {
+			s.activate(s.views[0])
 		}
-		if v == nil {
-			v = s.views[0]
-		}
-		if v.app != nil {
+		if v := s.active; v.app != nil {
 			v.app.Key(ui.Keysym(s.keys.keysym(key)))
 			s.redraw(v.app)
 		}
