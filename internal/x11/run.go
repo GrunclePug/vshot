@@ -52,7 +52,7 @@ func run(s *Session, a *ui.App) error {
 	for !a.Done() {
 		ev, err := s.X.WaitForEvent()
 		if ev == nil && err == nil {
-			return errors.New("X connection closed")
+			return errors.New("connection to the X server closed")
 		}
 
 		// Handle everything queued before redrawing once, so fast pointer
